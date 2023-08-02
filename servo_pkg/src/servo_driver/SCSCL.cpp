@@ -5,7 +5,7 @@
  * 作者: 
  */
 
-#include "inc/SCSCL.h"
+#include "SCSCL.h"
 
 SCSCL::SCSCL()
 {

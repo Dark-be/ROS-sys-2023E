@@ -5,7 +5,7 @@
  * 作者: 
  */
 
-#include "inc/SCSerial.h"
+#include "SCSerial.h"
 
 SCSerial::SCSerial()
 {

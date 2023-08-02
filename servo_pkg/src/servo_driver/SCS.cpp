@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stddef.h>
-#include "inc/SCS.h"
+#include "SCS.h"
 
 SCS::SCS()
 {

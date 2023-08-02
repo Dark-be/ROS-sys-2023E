@@ -14,17 +14,17 @@ void key_callback(const std_msgs::Int8& msg){
 }
 
 //img point或者发rectangle 2 ------------------------------------------------------------------------------------
-int flag=0;
+int img_flag=0;
 float LaserPoint[2]={0,0};
 float RectanglePoint[8]={0,0,0,0, 0,0,0,0};
-void img_callback(const std_msgs::Float32MultiArray& msg){
-    ROS_INFO("Control_node:recv img: length:%d,point:%f %f",msg.data.size(),msg.data[0],msg.data[1]);
-    if(msg.data.size()==2);
+void img_callback(const std_msgs::Float32MultiArray::ConstPtr& msg){
+    ROS_INFO("Control_node:recv img: length:%d,point:%f %f",msg->data.size(),msg->data[0],msg->data[1]);
+    if(msg->data.size()==2);
 }
 
 //servo pitch roll ------------------------------------------------------------------------------------
-void servo_callback(const std_msgs::Int16MultiArray& msg){
-    ROS_INFO("Control_node:recv servo: ",msg.data);
+void servo_callback(const std_msgs::Int16MultiArray::ConstPtr& msg){
+    ROS_INFO("Control_node:recv servo: ",msg->data);
 }
 
 int main(int argc, char **argv) {
@@ -39,17 +39,44 @@ int main(int argc, char **argv) {
     ros::Publisher key_pub = nh.advertise<std_msgs::Int8>("key/write", 10);
     ros::Publisher img_pub = nh.advertise<std_msgs::Int8>("img/write", 10);
     ros::Publisher servo_pub = nh.advertise<std_msgs::Int16MultiArray>("servo/write", 10);
-
     // 50hz频率执行
-    std_msgs::Int8 read_msg;
-    std::string read_str;
+    std_msgs::Int8 key_msg;
+    std_msgs::Int8 img_msg;
+    std_msgs::Int16MultiArray servo_msg;
 
-    ros::Rate loop_rate(50);
+    double start_time=ros::Time::now().toSec();
+    double run_time=0;
+    ros::Rate loop_rate(1);
     while (ros::ok()) {
         ros::spinOnce();
+        key_msg.data='y';
+        
+
+        img_msg.data=img_flag;
+        
+
+        servo_msg.data.resize(4);
+        servo_msg.data[0]=1000;//pos
+        servo_msg.data[1]=1000;//vel
+        servo_msg.data[2]=1000;//pos
+        servo_msg.data[3]=1000;//vel
+        
+
+        run_time=ros::Time::now().toSec()-start_time;
+        if((int)run_time%4<2){
+            servo_msg.data[0]=0;//pos
+            servo_msg.data[2]=0;//pos
+            ROS_INFO("0");
+        }
+        else{
+
+        }
 
 
 
+        img_pub.publish(img_msg);
+        key_pub.publish(key_msg);
+        servo_pub.publish(servo_msg);
 
 
         loop_rate.sleep();

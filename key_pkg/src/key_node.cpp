@@ -52,13 +52,16 @@ int main(int argc, char **argv) {
     std_msgs::Int8 read_msg;
     std::string read_str;
 
-    ros::Rate loop_rate(100);
+    ros::Rate loop_rate(50);
     while (ros::ok()) {
         ros::spinOnce();
         if (ser.available()) {
             read_str=ser.read(ser.available());
-            read_msg.data=std::stoi(read_str);
-            ROS_INFO("Read: %s",read_str.c_str());
+
+            read_msg.data=read_str[0];
+            key_pub.publish(read_msg);
+
+            ROS_INFO("Key_node read: %d",read_str[0]);
         }
         loop_rate.sleep();
     }

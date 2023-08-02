@@ -5,7 +5,7 @@
  * зїеп: 
  */
 
-#include "inc/SMSCL.h"
+#include "SMSCL.h"
 
 SMSCL::SMSCL()
 {

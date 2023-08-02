@@ -4,4 +4,6 @@
 
     <node pkg="servo_pkg" type="servo_node" name="servo_node_" output="screen"/>
 
+    <node pkg="control_pkg" type="control_node" name="control_node_" output="screen"/>
+
 </launch>
