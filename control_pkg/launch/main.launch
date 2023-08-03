@@ -1,8 +1,8 @@
 <launch>
 
-    <node pkg="key_pkg" type="key_node" name="key_node_" output="screen"/>
+    <node pkg="key_pkg" type="key_node" name="key_node_" />
 
-    <node pkg="servo_pkg" type="servo_node" name="servo_node_" output="screen"/>
+    <node pkg="servo_pkg" type="servo_node" name="servo_node_"  />
 
     <node pkg="control_pkg" type="control_node" name="control_node_" output="screen"/>
 

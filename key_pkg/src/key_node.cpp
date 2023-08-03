@@ -25,12 +25,11 @@ int open_serial(std::string port){
         return -1;
     }
 }
-const uint8_t head[2]={0xC8,0xFF};
+
 //发送到下位机
 void servo_callback(const std_msgs::Int8& msg){
     uint8_t buffer[1] = {static_cast<uint8_t>(msg.data)};
     ROS_INFO("Key_node:recv %c and send to keyboard",msg.data);
-    ser.write(head, 2);
     ser.write(buffer, 1);
 }
 

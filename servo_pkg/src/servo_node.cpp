@@ -17,8 +17,8 @@ void servo_callback(const std_msgs::Int16MultiArray::ConstPtr& msg){
 void signalHandler(int sig)
 {
     // 在这里编写你的中断处理代码
-    ServoDriver.WritePosEx(1,0,1000,254);
-	ServoDriver.WritePosEx(2,0,1000,254);
+    ServoDriver.WritePosEx(1,0,1024,254);
+	ServoDriver.WritePosEx(2,0,1024,254);
     ROS_INFO("Servo_node:shutdown");
     ros::shutdown();
 }
@@ -45,8 +45,8 @@ int main(int argc, char **argv) {
 
     // 100hz频率执行
     std::string read_str;
-    ServoDriver.WritePosEx(1,0,1000,254);
-	ServoDriver.WritePosEx(2,0,1000,254);
+    ServoDriver.WritePosEx(1,1000,1000,254);
+	ServoDriver.WritePosEx(2,1000,1000,254);
 
     ros::Rate loop_rate(50);
     while (ros::ok()) {
