@@ -24,7 +24,7 @@
 int key_index=0;
 void key_callback(const std_msgs::Int8& msg){
     uint8_t buffer[1] = {static_cast<uint8_t>(msg.data)};
-    key_index=msg.data;
+    key_index=msg.data-'0';
     ROS_INFO("Control_node:recv key %d and ready to change something",msg.data);
 }
 
@@ -56,22 +56,28 @@ float error[2]={0,0};
 float error_sum[2]={0,0};
 float error_last[2]={0,0};
 
-//暂不使用
-void servo_callback(const std_msgs::Int16MultiArray::ConstPtr& msg){
-    ROS_INFO("Control_node:recv servo: ",msg->data);
-}
+//暂不使用舵机反馈
+// void servo_callback(const std_msgs::Int16MultiArray::ConstPtr& msg){
+//     ROS_INFO("Control_node:recv servo: ",msg->data);
+// }
 
 //pitch roll
 float rectangle_point[8]={16,-5.5,  -15.0,-6,  -15.7,25.5,  16.4,26};
-void SaveRectangle(int index,int x,int y){
+void SaveRectangle(int index,float x,float y){
     rectangle_point[index*2]=x;
     rectangle_point[index*2+1]=y;
 }
-//绝对坐标的误差
-void SetServoTarget(float target_x,float target_y,float current_x,float current_y,float dt){
-    
+float center_point[2]={0,0};
+void SaveCenter(int x,int y){
+    center_point[0]=x;
+    center_point[1]=y;
 }
 
+
+void SetServoTarget(float target_x,float target_y){
+    
+}
+//建模XY与PitchRoll的关系
 const float L=60;
 const float l=4;
 void AngleToXY(float pitch,float roll,float& x,float& y){
@@ -146,7 +152,7 @@ int main(int argc, char **argv){
             }
             break;
         }
-        //按键调整激光位置 1 16 81
+        //按键调整激光位置 0.1 0.5 5 20cm 4挡
         case 1:{
             if(key_index==KEY_Up){
                 servo_XYtarget[1]+=fix_speed;
@@ -182,12 +188,16 @@ int main(int argc, char **argv){
                 ROS_INFO("Save %d",count);
                 img_msg.data=count;
                 img_pub.publish(img_msg);
-                SaveRectangle(count-1,servo_XY[0],servo_XY[1]);
+                if(count<5){
+                    SaveRectangle(count-1,servo_XY[0],servo_XY[1]);
+                }
+                else{
+                    SaveCenter(servo_XY[0],servo_XY[1]);
+                }
                 count++;
-                if(count==5){//标定完成
+                if(count==6){//标定完成
                     global_state=0;
                     count=1;
-                    ROS_INFO("%d %d %d %d %d %d %d %d",rectangle_point[0],rectangle_point[1],rectangle_point[2],rectangle_point[3],rectangle_point[4],rectangle_point[5],rectangle_point[6],rectangle_point[7]);
                 }
             }
             break;
@@ -195,7 +205,7 @@ int main(int argc, char **argv){
         case 2:{
             img_msg.data=5;
             img_pub.publish(img_msg);
-            float center[]={(rectangle_point[0]+rectangle_point[2]+rectangle_point[4]+rectangle_point[6]),(rectangle_point[1]+rectangle_point[3]+rectangle_point[5]+rectangle_point[7])/4};
+            float center[]={(rectangle_point[0]+rectangle_point[2]+rectangle_point[4]+rectangle_point[6])/4,(rectangle_point[1]+rectangle_point[3]+rectangle_point[5]+rectangle_point[7])/4};
             servo_XYtarget[0]+=0.16*(center[0]-servo_XYtarget[0]);
             servo_XYtarget[1]+=0.16*(center[1]-servo_XYtarget[1]);
             if(key_index==KEY_CONFIRM){
@@ -224,8 +234,7 @@ int main(int argc, char **argv){
         
         error[0]=servo_XYtarget[0]-servo_XY[0];
         error[1]=servo_XYtarget[1]-servo_XY[1];
-
-
+        //纯P
         servo_raw[0]+=error[0]*5;
         servo_raw[1]+=error[1]*5;
 
@@ -233,7 +242,7 @@ int main(int argc, char **argv){
         servo_msg.data[0]=servo_raw[0];//pos x
         servo_msg.data[2]=servo_raw[1];//pos y
 
-        ROS_INFO("state:%d s:%d xy:%.3f %.3f,target:%.3f %.3f target raw:%d %d",
+        ROS_INFO("state:%d s:%d xy:%.3f %.3f,target:%.3f %.3f target raw:%.3f %.3f",
         global_state,speed_flag,servo_XY[0],servo_XY[1],servo_XYtarget[0],servo_XYtarget[1],servo_raw[0],servo_raw[1]);
         key_index=0;
         //img_pub.publish(img_msg);
