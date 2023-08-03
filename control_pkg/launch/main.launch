@@ -1,10 +1,16 @@
 <launch>
 
-    <node pkg="key_pkg" type="key_node" name="key_node_" />
+    <node pkg="key_pkg" type="key_node" name="key_node_"/>
 
     <node pkg="servo_pkg" type="servo_node" name="servo_node_"  />
 
-    <node pkg="control_pkg" type="control_node" name="control_node_" output="screen"/>
+    <node pkg="control_pkg" type="control_node" name="control_node_" output="screen">
+        <param name="offsetx" type="string" value="0.5" />
+        <param name="offsety" type="string" value="-20.5" />
+        <param name="scalex" type="string" value="1.13" />
+        <param name="scaley" type="string" value="-1.097" />
+        <param name="startstate" type="int" value="4" />
+    </node>
 
     <node pkg="image_proc" type="image_proc" name="image_node_" output="screen"/> 
 

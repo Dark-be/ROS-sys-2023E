@@ -352,6 +352,7 @@ bool getRec(cv::Mat input)
         if(approx.size() >= 4) 
         {
             cv::drawContours(input, std::vector<std::vector<cv::Point>>(1, approx), -1, cv::Scalar(0, 255, 0), 2);
+            cv::imshow("rectangular", input);
         }   
     }
     cv::RotatedRect rect1 = cv::minAreaRect(maxRecContours[0]);
@@ -359,35 +360,46 @@ bool getRec(cv::Mat input)
     cv::Point2f box1[4], box2[4];
     rect1.points(box1);
     rect2.points(box2);
-    std::vector<cv::Point2f> sorted_box1 = sortPoints(box1);
-    std::vector<cv::Point2f> sorted_box2 = sortPoints(box2);
+    // std::vector<cv::Point2f> sorted_box1 = sortPoints(box1);
+    // std::vector<cv::Point2f> sorted_box2 = sortPoints(box2);
     cv::Point2f center_points[4];
     for(int i = 0; i < 4; i++) 
     {
-        center_points[i] = (sorted_box1[i] + sorted_box2[i]) / 2;
+        center_points[i] = (box1[i] + 3*box2[i]) / 4;
         // std::cout << "rectangular" << i << " : " << center_points[i] << std::endl;
+        if(pubRecFlag)
+        {
+            center_points[i].x = (center_points[i].x - dstWidth/2) / 10;
+            center_points[i].y = (center_points[i].y - dstHeight/2) / 10;
+            pubPoint.data.push_back(center_points[i].x);
+            pubPoint.data.push_back(center_points[i].y);
+        }
+        if(i==3)
+        {
+            return true;
+        }
     }
-    if(pubRecFlag)
-    {
-        // Eigen::Vector3d recTargetPoint = getRealLocation(center_points[i]);
-        center_points[0].x = (center_points[0].x - dstWidth/2) / 10;
-        center_points[0].y = (center_points[0].y - dstHeight/2) / 10;
-        pubPoint.data.push_back(center_points[0].x);
-        pubPoint.data.push_back(center_points[0].y);
-        center_points[1].x = (center_points[1].x - dstWidth/2) / 10;
-        center_points[1].y = (center_points[1].y - dstHeight/2) / 10;
-        pubPoint.data.push_back(center_points[1].x);
-        pubPoint.data.push_back(center_points[1].y);
-        center_points[3].x = (center_points[3].x - dstWidth/2) / 10;
-        center_points[3].y = (center_points[3].y - dstHeight/2) / 10;
-        pubPoint.data.push_back(center_points[3].x);
-        pubPoint.data.push_back(center_points[3].y);
-        center_points[2].x = (center_points[2].x - dstWidth/2) / 10;
-        center_points[2].y = (center_points[2].y - dstHeight/2) / 10;
-        pubPoint.data.push_back(center_points[2].x);
-        pubPoint.data.push_back(center_points[2].y);
-        return true;
-    }
+    // if(pubRecFlag)
+    // {
+    //     // Eigen::Vector3d recTargetPoint = getRealLocation(center_points[i]);
+    //     center_points[0].x = (center_points[0].x - dstWidth/2) / 10;
+    //     center_points[0].y = (center_points[0].y - dstHeight/2) / 10;
+    //     pubPoint.data.push_back(center_points[0].x);
+    //     pubPoint.data.push_back(center_points[0].y);
+    //     center_points[1].x = (center_points[1].x - dstWidth/2) / 10;
+    //     center_points[1].y = (center_points[1].y - dstHeight/2) / 10;
+    //     pubPoint.data.push_back(center_points[1].x);
+    //     pubPoint.data.push_back(center_points[1].y);
+    //     center_points[3].x = (center_points[3].x - dstWidth/2) / 10;
+    //     center_points[3].y = (center_points[3].y - dstHeight/2) / 10;
+    //     pubPoint.data.push_back(center_points[3].x);
+    //     pubPoint.data.push_back(center_points[3].y);
+    //     center_points[2].x = (center_points[2].x - dstWidth/2) / 10;
+    //     center_points[2].y = (center_points[2].y - dstHeight/2) / 10;
+    //     pubPoint.data.push_back(center_points[2].x);
+    //     pubPoint.data.push_back(center_points[2].y);
+    //     return true;
+    // }
     return false;
 }
 
@@ -395,12 +407,59 @@ bool getRec(cv::Mat input)
  * image process function
  * sort four corners of rectangular from the leftest in clockwise
 */
+// std::vector<cv::Point2f> sortPoints(cv::Point2f points[4]) 
+// {
+//     std::vector<cv::Point2f> sortedPoints(points, points + 4);
+//     // get the highest point
+//     cv::Point2f minYPoint = std::min_element(sortedPoints.begin(), sortedPoints.end(), 
+//     [](const cv::Point2f &a, const cv::Point2f &b) -> bool { 
+//         return a.y < b.y; 
+//     });
+//     sortedPoints.push_back(minYPoint);
+//     // get the rightest point
+//     cv::Point2f maxXPoint = std::max_element(sortedPoints.begin(), sortedPoints.end(), 
+//     [](const cv::Point2f &a, const cv::Point2f &b) -> bool { 
+//         return a.x < b.x; 
+//     });
+//     // get the lowest point
+//     cv::Point2f maxYPoint = std::max_element(sortedPoints.begin(), sortedPoints.end(), 
+//     [](const cv::Point2f &a, const cv::Point2f &b) -> bool { 
+//         return a.y < b.y; 
+//     });
+//     // get the leftest point
+//     cv::Point2f minXPoint = std::min_element(sortedPoints.begin(), sortedPoints.end(), 
+//     [](const cv::Point2f &a, const cv::Point2f &b) -> bool { 
+//         return a.y < b.y; 
+//     });
+//     if(minYPoint.x != maxXPoint.x)
+//     {
+//         sortedPoints.push_back(maxXPoint);
+//         sortedPoints.push_back(maxYPoint);
+//         sortedPoints.push_back(minXPoint);
+//     }
+//     else
+//     {
+//         if(maxXPoint.y == minXPoint.y)
+//         {
+//             sortedPoints.push_back(maxXPoint);
+
+//         }
+//         else
+//         {
+//             sortedPoints.push_back(maxXPoint);
+
+//         }
+        
+//     }
+    
+//     // 现在，sorted_points中的点是顺时针排序的，从左上角开始
+//     return sortedPoints;
+// }
 std::vector<cv::Point2f> sortPoints(cv::Point2f points[4]) 
 {
-    // 将四个点存储到std::vector中
     std::vector<cv::Point2f> sortedPoints(points, points + 4);
     
-    // 根据y坐标对点进行排序，y坐标小的在前面
+    // sorted the highest points
     std::sort(sortedPoints.begin(), sortedPoints.end(), 
         [](const cv::Point2f &a, const cv::Point2f &b) -> bool { 
             return a.y < b.y; 

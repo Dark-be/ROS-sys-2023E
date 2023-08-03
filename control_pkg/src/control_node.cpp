@@ -96,7 +96,7 @@ void SaveCenter(int x,int y){
 //建模XY与PitchRoll的关系
 const float L=100;
 const float l=4;
-float servo_to_camera[]={0,-25,1.25,-1};//offset scale servo 1~camera 2;then 2 
+float servo_to_camera[]={0,-24,1.24,-1};//offset scale servo 1~camera 2;then 2 
 void AngleToXY(float pitch,float roll,float& x,float& y){
     y=tanf(pitch)*(L)+l*cosf(pitch)+l*sinf(pitch)*sinf(pitch);
     x=tanf(roll)*(sqrtf(y*y+L*L));
@@ -111,6 +111,22 @@ int main(int argc, char **argv){
     ros::init(argc, argv, "control_node");
     ros::NodeHandle nh;
     ROS_INFO("Intializing Control...");
+    std::string offsetxStr, offsetyStr, scalexStr, scaleyStr;
+    if (nh.getParam("control_node_/offsetx", offsetxStr) &&
+      nh.getParam("control_node_/offsety", offsetyStr) &&
+      nh.getParam("control_node_/scalex", scalexStr) &&
+      nh.getParam("control_node_/scaley", scaleyStr))
+    {
+        // 将字符串值转换为浮点数类型
+        servo_to_camera[0] = std::stof(offsetxStr);
+        servo_to_camera[1] = std::stof(offsetyStr);
+        servo_to_camera[2] = std::stof(scalexStr);
+        servo_to_camera[3] = std::stof(scaleyStr);
+    }
+    
+    nh.getParam("control_node_/startstate", key_index);
+    ROS_INFO("offsetx:%f offsety:%f scalex:%f scaley:%f startstate:%d", servo_to_camera[0],servo_to_camera[1],servo_to_camera[2],servo_to_camera[3],key_index);
+
     //订阅话题读取键盘按键，点坐标（分别是点和矩形四点），舵机角度反馈
     ros::Subscriber key_sub = nh.subscribe("key/read", 10, key_callback);
     ros::Subscriber img_sub = nh.subscribe("img/read", 10, img_callback);
@@ -310,15 +326,27 @@ int main(int argc, char **argv){
                 break;
             }
             case 4:{
-                const int index0=2*(((int)run_time%24/6));//0~23 /6=0~3  0 2 4 6
+                const int index0=2*(((int)run_time%28/7));//0~23 /6=0~3  0 2 4 6
                 const int index1=index0+1;// 1 3 5 7
 
-                servo_XYtarget[0]+=0.08*((rectangle_point[index0]+servo_to_camera[0])*servo_to_camera[2]-servo_XYtarget[0]);//pos x
-                servo_XYtarget[1]+=0.08*((rectangle_point[index1]+servo_to_camera[1])*servo_to_camera[3]-servo_XYtarget[1]);//pos y
+                float x_delta=abs((rectangle_point[index0]+servo_to_camera[0])*servo_to_camera[2]-servo_XYtarget[0]);
+                float y_delta=abs((rectangle_point[index1]+servo_to_camera[1])*servo_to_camera[3]-servo_XYtarget[1]);
+                if(x_delta>=5){
+                    x_delta=0.07;
+                }
+                else if(x_delta<5){
+                    x_delta=0.1;
+                }
+                if(y_delta>=5){
+                    y_delta=0.07;
+                }
+                else if(y_delta<5){
+                    y_delta=0.1;
+                }
 
+                servo_XYtarget[0]+=x_delta*((rectangle_point[index0]+servo_to_camera[0])*servo_to_camera[2]-servo_XYtarget[0]);//pos x
+                servo_XYtarget[1]+=y_delta*((rectangle_point[index1]+servo_to_camera[1])*servo_to_camera[3]-servo_XYtarget[1]);//pos y
 
-                //servo_XYtarget[0]=rectangle_point[index0]+servo_to_camera[0];
-                //servo_XYtarget[1]=rectangle_point[index1]+servo_to_camera[1];
                 break;
             }
             default:
