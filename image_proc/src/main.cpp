@@ -42,8 +42,6 @@ camodocal::PinholeCamera cam;
 bool getRedPoint(cv::Mat input);
 bool getGreenPoint(cv::Mat input);
 bool getRec(cv::Mat input);
-double calculatePixelDistance(const cv::Point2f& point1, const cv::Point2f& point2);
-std::vector<cv::Point2f> sortPoints(cv::Point2f points[4]);
 Eigen::Vector3d getRealLocation(cv::Point2f targetPoint);
 bool compareContourAreas(const std::vector<cv::Point>& contour1, const std::vector<cv::Point>& contour2);
 void getState(const std_msgs::Int8 stateFlag);
@@ -379,113 +377,9 @@ bool getRec(cv::Mat input)
             return true;
         }
     }
-    // if(pubRecFlag)
-    // {
-    //     // Eigen::Vector3d recTargetPoint = getRealLocation(center_points[i]);
-    //     center_points[0].x = (center_points[0].x - dstWidth/2) / 10;
-    //     center_points[0].y = (center_points[0].y - dstHeight/2) / 10;
-    //     pubPoint.data.push_back(center_points[0].x);
-    //     pubPoint.data.push_back(center_points[0].y);
-    //     center_points[1].x = (center_points[1].x - dstWidth/2) / 10;
-    //     center_points[1].y = (center_points[1].y - dstHeight/2) / 10;
-    //     pubPoint.data.push_back(center_points[1].x);
-    //     pubPoint.data.push_back(center_points[1].y);
-    //     center_points[3].x = (center_points[3].x - dstWidth/2) / 10;
-    //     center_points[3].y = (center_points[3].y - dstHeight/2) / 10;
-    //     pubPoint.data.push_back(center_points[3].x);
-    //     pubPoint.data.push_back(center_points[3].y);
-    //     center_points[2].x = (center_points[2].x - dstWidth/2) / 10;
-    //     center_points[2].y = (center_points[2].y - dstHeight/2) / 10;
-    //     pubPoint.data.push_back(center_points[2].x);
-    //     pubPoint.data.push_back(center_points[2].y);
-    //     return true;
-    // }
     return false;
 }
 
-/*
- * image process function
- * sort four corners of rectangular from the leftest in clockwise
-*/
-// std::vector<cv::Point2f> sortPoints(cv::Point2f points[4]) 
-// {
-//     std::vector<cv::Point2f> sortedPoints(points, points + 4);
-//     // get the highest point
-//     cv::Point2f minYPoint = std::min_element(sortedPoints.begin(), sortedPoints.end(), 
-//     [](const cv::Point2f &a, const cv::Point2f &b) -> bool { 
-//         return a.y < b.y; 
-//     });
-//     sortedPoints.push_back(minYPoint);
-//     // get the rightest point
-//     cv::Point2f maxXPoint = std::max_element(sortedPoints.begin(), sortedPoints.end(), 
-//     [](const cv::Point2f &a, const cv::Point2f &b) -> bool { 
-//         return a.x < b.x; 
-//     });
-//     // get the lowest point
-//     cv::Point2f maxYPoint = std::max_element(sortedPoints.begin(), sortedPoints.end(), 
-//     [](const cv::Point2f &a, const cv::Point2f &b) -> bool { 
-//         return a.y < b.y; 
-//     });
-//     // get the leftest point
-//     cv::Point2f minXPoint = std::min_element(sortedPoints.begin(), sortedPoints.end(), 
-//     [](const cv::Point2f &a, const cv::Point2f &b) -> bool { 
-//         return a.y < b.y; 
-//     });
-//     if(minYPoint.x != maxXPoint.x)
-//     {
-//         sortedPoints.push_back(maxXPoint);
-//         sortedPoints.push_back(maxYPoint);
-//         sortedPoints.push_back(minXPoint);
-//     }
-//     else
-//     {
-//         if(maxXPoint.y == minXPoint.y)
-//         {
-//             sortedPoints.push_back(maxXPoint);
-
-//         }
-//         else
-//         {
-//             sortedPoints.push_back(maxXPoint);
-
-//         }
-        
-//     }
-    
-//     // 现在，sorted_points中的点是顺时针排序的，从左上角开始
-//     return sortedPoints;
-// }
-std::vector<cv::Point2f> sortPoints(cv::Point2f points[4]) 
-{
-    std::vector<cv::Point2f> sortedPoints(points, points + 4);
-    
-    // sorted the highest points
-    std::sort(sortedPoints.begin(), sortedPoints.end(), 
-        [](const cv::Point2f &a, const cv::Point2f &b) -> bool { 
-            return a.y < b.y; 
-        });
-    
-    // 现在，sorted_points[0]和sorted_points[1]是上面的两个点，sorted_points[2]和sorted_points[3]是下面的两个点
-    // 再根据x坐标对上面和下面的点进行排序，x坐标小的在前面
-    if (sortedPoints[0].x > sortedPoints[1].x) 
-        std::swap(sortedPoints[0], sortedPoints[1]);
-    if (sortedPoints[2].x > sortedPoints[3].x) 
-        std::swap(sortedPoints[2], sortedPoints[3]);
-    
-    // 现在，sorted_points中的点是顺时针排序的，从左上角开始
-    return sortedPoints;
-}
-
-/*
- * image process function
- * calculate the distance between pixels
-*/
-double calculatePixelDistance(const cv::Point2f& point1, const cv::Point2f& point2) 
-{
-    double dx = point2.x - point1.x;
-    double dy = point2.y - point1.y;
-    return std::sqrt(dx * dx + dy * dy);
-}
 
 /*
  * ros callback function

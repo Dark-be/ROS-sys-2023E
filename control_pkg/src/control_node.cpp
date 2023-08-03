@@ -155,7 +155,7 @@ int main(int argc, char **argv){
 
     long counter=0;
 
-    ros::Rate loop_rate(10);
+    ros::Rate loop_rate(50);
     while (ros::ok()) {
         ros::spinOnce();
         counter++;
@@ -302,31 +302,47 @@ int main(int argc, char **argv){
                 const int index1=index0+1;// 1 3 5 7
                 float x_delta=abs(edge_point[index0]-servo_XYtarget[0]);
                 float y_delta=abs(edge_point[index1]-servo_XYtarget[1]);
-                if(x_delta>=10){
+                if(sqrtf(x_delta*x_delta+y_delta*y_delta)>10){
+                    x_delta=0.1;
+                    y_delta=0.1;
+                }
+                else if(sqrtf(x_delta*x_delta+y_delta*y_delta)>5){
                     x_delta=0.2;
-                }
-                else if(x_delta<10){
-                    x_delta=1;
-                }
-                if(y_delta>=10){
                     y_delta=0.2;
                 }
-                else if(y_delta<10){
+                else if(sqrtf(x_delta*x_delta+y_delta*y_delta)>2){
+                    x_delta=0.5;
+                    y_delta=0.5;
+                }
+                else if(sqrtf(x_delta*x_delta+y_delta*y_delta)>1){
+                    x_delta=1;
                     y_delta=1;
                 }
+                // if(x_delta>=10){
+                //     x_delta=0.1//0.2;
+                // }
+                // else if(x_delta<10){
+                //     x_delta=//1;
+                // }
+                // if(y_delta>=10){
+                //     y_delta=0.2;
+                // }
+                // else if(y_delta<10){
+                //     y_delta=1;
+                // }
                 servo_XYtarget[0]+=x_delta*(edge_point[index0]-servo_XYtarget[0]);//pos x
                 servo_XYtarget[1]+=y_delta*(edge_point[index1]-servo_XYtarget[1]);//pos y
 
 
                 //servo_XYtarget[0]=edge_point[index0]+counter%20/20.0*(edge_point[index0+2>7?0:index0+2]-edge_point[index0]);
                 //servo_XYtarget[1]=edge_point[index1]+counter%20/20.0*(edge_point[index1+2>7?0:index1+2]-edge_point[index1]);
-                if(key_index==KEY_CONFIRM){
+                if(key_index==KEY_RESET){
                     global_state=0;
                 }
                 break;
             }
             case 4:{
-                const int index0=2*(((int)run_time%28/7));//0~23 /6=0~3  0 2 4 6
+                const int index0=2*(((int)run_time%4/1));//0~23 /6=0~3  0 2 4 6
                 const int index1=index0+1;// 1 3 5 7
 
                 float x_delta=abs((rectangle_point[index0]+servo_to_camera[0])*servo_to_camera[2]-servo_XYtarget[0]);
@@ -346,7 +362,9 @@ int main(int argc, char **argv){
 
                 servo_XYtarget[0]+=x_delta*((rectangle_point[index0]+servo_to_camera[0])*servo_to_camera[2]-servo_XYtarget[0]);//pos x
                 servo_XYtarget[1]+=y_delta*((rectangle_point[index1]+servo_to_camera[1])*servo_to_camera[3]-servo_XYtarget[1]);//pos y
-
+                if(key_index==KEY_RESET){
+                    global_state=0;
+                }
                 break;
             }
             default:

@@ -45,8 +45,8 @@ int main(int argc, char **argv) {
 
     // 100hz频率执行
     std::string read_str;
-    ServoDriver.WritePosEx(1,1000,1000,254);
-	ServoDriver.WritePosEx(2,1000,1000,254);
+    ServoDriver.WritePosEx(1,1024,1000,254);
+	ServoDriver.WritePosEx(2,1024,1000,254);
 
     ros::Rate loop_rate(50);
     while (ros::ok()) {
