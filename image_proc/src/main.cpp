@@ -20,19 +20,18 @@ using namespace cv;
  * set global parameters
 */
 bool redFlag = true;
-bool pubRedFlag = true;
+bool pubRedFlag = false;
 bool greenFlag = false;
 bool pubGreenFlag = false;
 bool recFlag = false;
 bool pubRecFlag = false;
 bool trackFlag = false;
 bool standardizeFlag = false;
-bool usePers = false;
 
 double camIntrinsics[4];
 double camDist[4];
 cv::Point2f redPointLocation, greenPointLocation;
-std::vector<cv::Point2f> srcPoints = {{124.,90.},{470.,90.},{470.,440.},{124.,440.}};
+std::vector<cv::Point2f> srcPoints ={{68.5,12.2},{528.7,9.6},{538.8,465.0},{69.9,471.4}};
 float dstWidth = 500;
 float dstHeight = 500;
 std::vector<cv::Point2f> dstPoints = {{0,0}, {dstWidth,0}, {dstWidth,dstHeight}, {0,dstHeight} };
@@ -43,9 +42,11 @@ camodocal::PinholeCamera cam;
 bool getRedPoint(cv::Mat input);
 bool getGreenPoint(cv::Mat input);
 bool getRec(cv::Mat input);
+double calculatePixelDistance(const cv::Point2f& point1, const cv::Point2f& point2);
+std::vector<cv::Point2f> sortPoints(cv::Point2f points[4]);
 Eigen::Vector3d getRealLocation(cv::Point2f targetPoint);
 bool compareContourAreas(const std::vector<cv::Point>& contour1, const std::vector<cv::Point>& contour2);
-void getState(const std_msgs::Int8::ConstPtr& stateFlag);
+void getState(const std_msgs::Int8 stateFlag);
 
 
 int main(int argc, char** argv) 
@@ -94,7 +95,6 @@ int main(int argc, char** argv)
         //-----------------------------------------ros callback-----------------------------------------------------
         ros::spinOnce();
         cap.read(input);
-        cv::imshow("image", input);
         //-------------------------------------apply undistortion to image------------------------------------------
         initUndistortRectifyMap(K, D, cv::Mat_<double>::eye(3, 3), K.clone(), imageSize, CV_16SC2, map1, map2);
         factorK << camIntrinsics[0], 0, camIntrinsics[2],
@@ -102,38 +102,26 @@ int main(int argc, char** argv)
                0, 0, 1;
         cv::remap(input, input, map1, map2, cv::INTER_LINEAR);
         cv::Size s = input.size();
-        // cv::imshow("undistortion", input);
+        cv::imshow("undistortion", input);
         //-------------------------------standardization finished, start to set roi---------------------------------
         if(standardizeFlag)
         {
-            cv::Rect roi(static_cast<int>(srcPoints[0].x), static_cast<int>(srcPoints[0].y), 
-            static_cast<int>(srcPoints[2].x-srcPoints[0].x), static_cast<int>(srcPoints[2].y-srcPoints[0].y)); 
-            std::cout << "roi : " << roi << std::endl;
-            imageROI = input(roi);
-        }
-        if(usePers)
-        {
             cv::Mat perspectiveMatrix = cv::getPerspectiveTransform(srcPoints,dstPoints);
-            cv::Mat  dst ;
-            cv::warpPerspective(input, dst, perspectiveMatrix, Point(dstWidth,dstHeight));
-            // cv::Point2f testPoint(299,85);
-            // cv::Point2f targetPoint(testPoint.x*perspectiveMatrix[0][0]+perspectiveMatrix[0][1]*)
-            // cv::circle(input, testPoint, 5, cv::Scalar(255, 0, 0), -1);
-            cv::imshow("Affine", dst);
+            cv::warpPerspective(input, imageROI, perspectiveMatrix, Point(dstWidth,dstHeight));
         }
         //---------------------------------------find red/green laser in image--------------------------------------
         if(redFlag)
         {
             if(standardizeFlag)
             {
-                if(getRedPoint(imageROI))
+                if(getRedPoint(imageROI) && pubRedFlag)
                 {
                     pointPub.publish(pubPoint);
                 }
             }
             else
             {
-                if(getRedPoint(input))
+                if(getRedPoint(input) && pubRedFlag)
                 {
                     pointPub.publish(pubPoint);
                 }
@@ -143,14 +131,14 @@ int main(int argc, char** argv)
         {
             if(standardizeFlag)
             {
-                if(getGreenPoint(imageROI))
+                if(getGreenPoint(imageROI) && pubGreenFlag)
                 {
                     pointPub.publish(pubPoint);
                 }
             }
             else
             {
-                if(getGreenPoint(input))
+                if(getGreenPoint(input) && pubGreenFlag)
                 {
                     pointPub.publish(pubPoint);
                 }
@@ -161,14 +149,14 @@ int main(int argc, char** argv)
         {
             if(standardizeFlag)
             {
-                if(getRec(imageROI))
+                if(getRec(imageROI) && pubRecFlag)
                 {
                     pointPub.publish(pubPoint);
                 }
             }
             else
             {
-                if(getRec(input))
+                if(getRec(input) && pubRecFlag)
                 {
                     pointPub.publish(pubPoint);
                 }
@@ -220,8 +208,7 @@ Eigen::Vector3d getRealLocation(cv::Point2f targetPoint)
     Eigen::Vector2d srcPoint, originSrc;
     Eigen::Vector3d dstPoint, originDst;
     srcPoint << targetPoint.x, targetPoint.y;
-    // originSrc << static_cast<double>((srcPoints[0].x+srcPoints[2].x)/2), static_cast<double>((srcPoints[0].y+srcPoints[2].y)/2);
-    originSrc << 297., 265.;
+    originSrc << static_cast<double>((srcPoints[0].x+srcPoints[2].x)/2), static_cast<double>((srcPoints[0].y+srcPoints[2].y)/2);
     std::cout << "originSrc : " << originSrc[0] << " , " << originSrc[1] << std::endl;
     cam.liftProjective(srcPoint, dstPoint);
     cam.liftProjective(originSrc, originDst);
@@ -230,6 +217,7 @@ Eigen::Vector3d getRealLocation(cv::Point2f targetPoint)
     dstPoint[1] = 1.1 * (dstPoint[1] - originDst[1]);
     return dstPoint;
 }
+
 /* 
  * image process function
  * get red Point from input
@@ -243,69 +231,85 @@ bool getRedPoint(cv::Mat input)
     // cv::inRange(hsvImg, lowerRed, upperRed, redMask);
     // cv::Mat redDiffMask;
     // cv::inRange(input, cv::Scalar(0, 0, 50), cv::Scalar(255, 255, 255), redDiffMask);
-    cv::Mat redMask;
-    cv::inRange(input, cv::Scalar(0, 0, 150), cv::Scalar(150, 150, 255), redMask);
-    cv::Mat whiteMask;
-    cv::inRange(input, cv::Scalar(200, 200, 200), cv::Scalar(255, 255, 255), whiteMask);
-    // redMask = (redMask | whiteMask) & redDiffMask;
-    redMask = (redMask | whiteMask);
-    cv::imshow("redMask",redMask);
+    cv::Mat bgr[3];
+    cv::split(input, bgr);
+
+    cv::Mat redMask = (bgr[2] - bgr[1]) > 50;  // B - G
+    cv::imshow("redMask", redMask);
+
     std::vector<std::vector<cv::Point>> redContours;
     cv::findContours(redMask, redContours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
     if(redContours.size())
     {
-        std::vector<cv::Point> maxRedContours = *std::max_element(redContours.begin(),redContours.end(),
+        std::vector<cv::Point> maxRedContours = *std::max_element(redContours.begin(), redContours.end(),
         [](const std::vector<cv::Point> &contour1, const std::vector<cv::Point> &contour2)
         {
             return cv::contourArea(contour1, false) < cv::contourArea(contour2, false);
         });
+
         cv::Moments redM = cv::moments(maxRedContours);
         redPointLocation.x = redM.m10 / redM.m00;
         redPointLocation.y = redM.m01 / redM.m00;
+
         if(pubRedFlag)
         {
-            Eigen::Vector3d redTargetPoint = getRealLocation(redPointLocation);
-            pubPoint.data.push_back(redTargetPoint[0]);
-            pubPoint.data.push_back(redTargetPoint[1]);
-            std::cout << "redRealPoint : " << redTargetPoint[0] << " , " << redTargetPoint[1] << std::endl;
+            // Eigen::Vector3d redTargetPoint = getRealLocation(redPointLocation);
+            redPointLocation.x = (redPointLocation.x - dstWidth/2) / 10;
+            redPointLocation.y = (redPointLocation.y - dstHeight/2) / 10;
+            pubPoint.data.push_back(redPointLocation.x);
+            pubPoint.data.push_back(redPointLocation.y);
+            // std::cout << "redRealPoint : " << redTargetPoint[0] << " , " << redTargetPoint[1] << std::endl;
         }
+
         std::cout << "redPoint : " << redPointLocation.x << " , " << redPointLocation.y << std::endl;
         return true;
     }
+
     return false;
 }
-
 /* 
  * image process function
  * get green Point from input
 */
 bool getGreenPoint(cv::Mat input)
 {
-    cv::Scalar lowerGreen = cv::Scalar(45, 50, 50);
-    cv::Scalar upperGreen = cv::Scalar(75, 255, 200);
-    cv::Mat greenMask, hsvImg;
-    cv::inRange(hsvImg, lowerGreen, upperGreen, greenMask);
+    cv::Mat bgr[3];
+    cv::split(input, bgr);
+
+    cv::Mat greenMask = (bgr[1] - bgr[2]) > 30;  // B - R
+    cv::imshow("greenMask", greenMask);
+
     std::vector<std::vector<cv::Point>> greenContours;
     cv::findContours(greenMask, greenContours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
     if(greenContours.size())
     {
-        std::vector<cv::Point> maxGreenContours = *std::max_element(greenContours.begin(),greenContours.end(),
+        std::vector<cv::Point> maxGreenContours = *std::max_element(greenContours.begin(), greenContours.end(),
         [](const std::vector<cv::Point> &contour1, const std::vector<cv::Point> &contour2)
         {
             return cv::contourArea(contour1, false) < cv::contourArea(contour2, false);
         });
+
         cv::Moments greenM = cv::moments(maxGreenContours);
         greenPointLocation.x = greenM.m10 / greenM.m00;
         greenPointLocation.y = greenM.m01 / greenM.m00;
+
         if(pubGreenFlag)
         {
-            Eigen::Vector3d greenTargetPoint = getRealLocation(greenPointLocation);
-            pubPoint.data.push_back(greenTargetPoint[0]);
-            pubPoint.data.push_back(greenTargetPoint[1]);
+            // Eigen::Vector3d greenTargetPoint = getRealLocation(greenPointLocation);
+            std::cout << "starting pub greenPoint" << std::endl;
+            greenPointLocation.x = (greenPointLocation.x - dstWidth/2) / 10;
+            greenPointLocation.y = (greenPointLocation.y - dstHeight/2) / 10;
+            pubPoint.data.push_back(greenPointLocation.x);
+            pubPoint.data.push_back(greenPointLocation.y);
+            // std::cout << "greenRealPoint : " << greenTargetPoint[0] << " , " << greenTargetPoint[1] << std::endl;
         }
+
         std::cout << "greenPoint : " << greenPointLocation.x << " , " << greenPointLocation.y << std::endl;
         return true;
     }
+
     return false;
 }
 
@@ -355,35 +359,89 @@ bool getRec(cv::Mat input)
     cv::Point2f box1[4], box2[4];
     rect1.points(box1);
     rect2.points(box2);
+    std::vector<cv::Point2f> sorted_box1 = sortPoints(box1);
+    std::vector<cv::Point2f> sorted_box2 = sortPoints(box2);
     cv::Point2f center_points[4];
     for(int i = 0; i < 4; i++) 
     {
-        center_points[i] = (box1[i] + box2[i]) / 2;
-        std::cout << "rectangular" << i << " : " << center_points[i] << std::endl;
-        if(pubRecFlag)
-        {
-            Eigen::Vector3d recTargetPoint = getRealLocation(center_points[i]);
-            pubPoint.data.push_back(recTargetPoint[0]);
-            pubPoint.data.push_back(recTargetPoint[1]);
-        }
-        if(i==3)
-        {
-            return true;
-        }
+        center_points[i] = (sorted_box1[i] + sorted_box2[i]) / 2;
+        // std::cout << "rectangular" << i << " : " << center_points[i] << std::endl;
+    }
+    if(pubRecFlag)
+    {
+        // Eigen::Vector3d recTargetPoint = getRealLocation(center_points[i]);
+        center_points[0].x = (center_points[0].x - dstWidth/2) / 10;
+        center_points[0].y = (center_points[0].y - dstHeight/2) / 10;
+        pubPoint.data.push_back(center_points[0].x);
+        pubPoint.data.push_back(center_points[0].y);
+        center_points[1].x = (center_points[1].x - dstWidth/2) / 10;
+        center_points[1].y = (center_points[1].y - dstHeight/2) / 10;
+        pubPoint.data.push_back(center_points[1].x);
+        pubPoint.data.push_back(center_points[1].y);
+        center_points[3].x = (center_points[3].x - dstWidth/2) / 10;
+        center_points[3].y = (center_points[3].y - dstHeight/2) / 10;
+        pubPoint.data.push_back(center_points[3].x);
+        pubPoint.data.push_back(center_points[3].y);
+        center_points[2].x = (center_points[2].x - dstWidth/2) / 10;
+        center_points[2].y = (center_points[2].y - dstHeight/2) / 10;
+        pubPoint.data.push_back(center_points[2].x);
+        pubPoint.data.push_back(center_points[2].y);
+        return true;
     }
     return false;
+}
+
+/*
+ * image process function
+ * sort four corners of rectangular from the leftest in clockwise
+*/
+std::vector<cv::Point2f> sortPoints(cv::Point2f points[4]) 
+{
+    // 将四个点存储到std::vector中
+    std::vector<cv::Point2f> sortedPoints(points, points + 4);
+    
+    // 根据y坐标对点进行排序，y坐标小的在前面
+    std::sort(sortedPoints.begin(), sortedPoints.end(), 
+        [](const cv::Point2f &a, const cv::Point2f &b) -> bool { 
+            return a.y < b.y; 
+        });
+    
+    // 现在，sorted_points[0]和sorted_points[1]是上面的两个点，sorted_points[2]和sorted_points[3]是下面的两个点
+    // 再根据x坐标对上面和下面的点进行排序，x坐标小的在前面
+    if (sortedPoints[0].x > sortedPoints[1].x) 
+        std::swap(sortedPoints[0], sortedPoints[1]);
+    if (sortedPoints[2].x > sortedPoints[3].x) 
+        std::swap(sortedPoints[2], sortedPoints[3]);
+    
+    // 现在，sorted_points中的点是顺时针排序的，从左上角开始
+    return sortedPoints;
+}
+
+/*
+ * image process function
+ * calculate the distance between pixels
+*/
+double calculatePixelDistance(const cv::Point2f& point1, const cv::Point2f& point2) 
+{
+    double dx = point2.x - point1.x;
+    double dy = point2.y - point1.y;
+    return std::sqrt(dx * dx + dy * dy);
 }
 
 /*
  * ros callback function
  * get selected mode and enable flag
 */
-void getState(const std_msgs::Int8::ConstPtr& stateFlag)
+void getState(const std_msgs::Int8 stateFlag)
 {
-    int8_t flag = stateFlag->data;
+    int8_t flag = stateFlag.data;
+    ROS_INFO("flag is %d", flag);
     //---------------- start standarlization and standardizing--------------------
     if(flag==1 || flag==2 || flag==3)
     {
+        recFlag = false;
+        standardizeFlag = false;
+        trackFlag = false;
         pubRedFlag = false;
         pubRecFlag = false;
         pubGreenFlag = false;
@@ -401,6 +459,11 @@ void getState(const std_msgs::Int8::ConstPtr& stateFlag)
     //-------------------- finish standarlization--------------------------------
     if(flag == 4)
     {
+        recFlag = false;
+        trackFlag = false;
+        pubRedFlag = false;
+        pubRecFlag = false;
+        pubGreenFlag = false;
         if(redFlag)
         {
             srcPoints.push_back(redPointLocation);
@@ -420,7 +483,11 @@ void getState(const std_msgs::Int8::ConstPtr& stateFlag)
     {
         if(redFlag)
         {
+            recFlag = false;
             pubRedFlag = true;
+            pubRecFlag = false;
+            pubGreenFlag = false;
+            trackFlag = false;
         }
     }
     //----------------------basic requirement(2)--------------------------------
@@ -430,7 +497,11 @@ void getState(const std_msgs::Int8::ConstPtr& stateFlag)
     {
         if(redFlag)
         {
+            recFlag = false;
             pubRedFlag = true;
+            pubRecFlag = false;
+            pubGreenFlag = false;
+            trackFlag = false;
         }
     }
     //----------------------basic requirement(3)(4)-----------------------------
@@ -441,8 +512,11 @@ void getState(const std_msgs::Int8::ConstPtr& stateFlag)
     {
         if(redFlag)
         {
-            pubRedFlag = true;
+            recFlag = true;
+            pubRedFlag = false;
             pubRecFlag = true;
+            pubGreenFlag = false;
+            trackFlag = false;
         }
     }
     //-------------extend requirement(1)(2) for green laser system--------------
@@ -451,8 +525,11 @@ void getState(const std_msgs::Int8::ConstPtr& stateFlag)
     {
         if(greenFlag)
         {
+            recFlag = false;
             trackFlag = true;
+            pubRecFlag = false;
+            pubGreenFlag = false;
+            pubRedFlag = false;
         }
     }
 }
-

@@ -19,8 +19,16 @@ include_directories(
   ${OpenCV_INCLUDE_DIRS}
 )
 add_executable(control_node src/control_node.cpp)
+add_executable(slave_node src/slave_node.cpp)
 target_link_libraries(control_node
   ${catkin_LIBRARIES}
   ${OpenCV_LIBRARIES}
 )
+target_link_libraries(slave_node
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+)
+
 add_dependencies(control_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(slave_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
