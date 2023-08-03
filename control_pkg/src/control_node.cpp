@@ -30,11 +30,17 @@ void key_callback(const std_msgs::Int8& msg){
 
 //img point或者发rectangle 2 ------------------------------------------------------------------------------------
 int img_flag=0;
-float LaserPoint[2]={0,0};
+size_t arrayLength = 0;
+std::vector<float> LaserPoint;
 float RectanglePoint[8]={1420,1167,902,1156,916,654,1359,645};
 void img_callback(const std_msgs::Float32MultiArray::ConstPtr& msg){
-    ROS_INFO("Control_node:recv img: length:%d,point:%f %f",msg->data.size(),msg->data[0],msg->data[1]);
-    if(msg->data.size()==2);
+    ROS_INFO("Control_node:recv img: length:%d",msg->data.size());
+    //if(msg->data.size()==2);
+    arrayLength = msg->data.size();
+    for (size_t i = 0; i < arrayLength; i++) {
+        ROS_INFO("Control_node:recv img: %f",msg->data[i]);
+        LaserPoint.push_back(msg->data[i]);
+    }
 }
 
 //servo pitch roll ------------------------------------------------------------------------------------
@@ -77,7 +83,8 @@ void XYToAngle(float x,float y,float& pitch,float& roll){
     roll=atan(x/sqrtf(y*y+L*L));
 }
 
-int main(int argc, char **argv) {
+
+int main(int argc, char **argv){
     ros::init(argc, argv, "control_node");
     ros::NodeHandle nh;
     ROS_INFO("Intializing Control...");
@@ -111,7 +118,6 @@ int main(int argc, char **argv) {
     while (ros::ok()) {
         ros::spinOnce();
         //key_msg.data='y';
-        img_msg.data=img_flag;
         
         run_time=ros::Time::now().toSec()-start_time;
 
@@ -131,7 +137,7 @@ int main(int argc, char **argv) {
 
         switch (global_state)
         {
-        case 0:
+        case 0:{
             if(key_index!=0&&key_index!=KEY_CONFIRM){
                 select_state=key_index;
             }
@@ -139,6 +145,7 @@ int main(int argc, char **argv) {
                 global_state=select_state;
             }
             break;
+        }
         //按键调整激光位置 1 16 81
         case 1:{
             if(key_index==KEY_Up){
@@ -207,26 +214,24 @@ int main(int argc, char **argv) {
             }
             break;
         }
-        case 4:
+        case 4:{
+
             break;
+        }
         default:
             break;
         }
         
         error[0]=servo_XYtarget[0]-servo_XY[0];
         error[1]=servo_XYtarget[1]-servo_XY[1];
-        //error_sum[0]+=error[0];
-        //error_sum[1]+=error[1];
 
-        servo_raw[0]+=error[0]*5;//+0.02*error_sum[0];
-        servo_raw[1]+=error[1]*5;//+0.02*error_sum[1];
 
-        //error_last[0]=error[0];
-        //error_last[1]=error[1];
+        servo_raw[0]+=error[0]*5;
+        servo_raw[1]+=error[1]*5;
+
 
         servo_msg.data[0]=servo_raw[0];//pos x
         servo_msg.data[2]=servo_raw[1];//pos y
-
 
         ROS_INFO("state:%d s:%d xy:%.3f %.3f,target:%.3f %.3f target raw:%d %d",
         global_state,speed_flag,servo_XY[0],servo_XY[1],servo_XYtarget[0],servo_XYtarget[1],servo_raw[0],servo_raw[1]);
@@ -235,7 +240,6 @@ int main(int argc, char **argv) {
         if(key_msg.data!=0)
         key_pub.publish(key_msg);
         servo_pub.publish(servo_msg);
-
 
         loop_rate.sleep();
     }

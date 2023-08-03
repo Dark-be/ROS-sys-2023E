@@ -6,4 +6,6 @@
 
     <node pkg="control_pkg" type="control_node" name="control_node_" output="screen"/>
 
+    <node pkg="image_proc" type="image_proc" name="image_node_" output="screen"/>
+
 </launch>
