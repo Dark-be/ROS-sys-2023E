@@ -6,8 +6,6 @@
 #include <fstream>  // For file operations
 #include <eigen3/Eigen/Core>
 #include <yaml-cpp/yaml.h>
-#include "CataCamera.h"
-#include "PinholeCamera.h"
 
 #include <ros/ros.h>
 #include <tf/transform_broadcaster.h>
@@ -19,33 +17,32 @@ using namespace cv;
 /*
  * set global parameters
 */
-bool redFlag = true;
-bool pubRedFlag = false;
-bool greenFlag = false;
-bool pubGreenFlag = false;
 bool recFlag = false;
-bool pubRecFlag = false;
 bool trackFlag = false;
 bool standardizeFlag = false;
+bool readFile = false;
+bool writeFile = false;
 
+int8_t flag = 0;
+int recCount = 0;
 double camIntrinsics[4];
 double camDist[4];
 cv::Point2f redPointLocation, greenPointLocation;
-std::vector<cv::Point2f> srcPoints ={{68.5,12.2},{528.7,9.6},{538.8,465.0},{69.9,471.4}};
+cv::Point2f redPointTransLocation, greenPointTransLocation;
+std::vector<cv::Point2f> srcPoints;
 float dstWidth = 500;
 float dstHeight = 500;
 std::vector<cv::Point2f> dstPoints = {{0,0}, {dstWidth,0}, {dstWidth,dstHeight}, {0,dstHeight} };
 std_msgs::Float32MultiArray pubPoint;
-camodocal::PinholeCamera cam;
+
+
 
 //********************the declaration of functions***********************
 bool getRedPoint(cv::Mat input);
 bool getGreenPoint(cv::Mat input);
 bool getRec(cv::Mat input);
-Eigen::Vector3d getRealLocation(cv::Point2f targetPoint);
 bool compareContourAreas(const std::vector<cv::Point>& contour1, const std::vector<cv::Point>& contour2);
 void getState(const std_msgs::Int8 stateFlag);
-
 
 int main(int argc, char** argv) 
 {
@@ -68,13 +65,11 @@ int main(int argc, char** argv)
     //-----------------------camera initialize---------------------------
     VideoCapture cap(0); 
     cap.set(CAP_PROP_FRAME_WIDTH,640);
-    cap.set(CAP_PROP_FRAME_HEIGHT,480);//ajust resoluction
+    cap.set(CAP_PROP_FRAME_HEIGHT,480);//adjust resoluction
     cap.set(cv::CAP_PROP_FPS, 30);
     // cap.set(cv::CAP_PROP_EXPOSURE,10);
     // cap.set(CAP_PROP_FOURCC, VideoWriter::fourcc('M','J','P','G'));
     cv::Mat input, imageROI;
-    cam = camodocal::PinholeCamera("pinholeCam", 640, 480, camDist[0], camDist[1], camDist[2],
-                                camDist[3], camIntrinsics[0], camIntrinsics[1], camIntrinsics[2], camIntrinsics[3]);
 
     //---------------------------Undistortion---------------------------
     const cv::Mat K = (cv::Mat_<double>(3, 3) << camIntrinsics[0], 0, camIntrinsics[2],
@@ -87,18 +82,21 @@ int main(int argc, char** argv)
     cv::Mat  map1, map2;
     Eigen::Matrix3f factorK;
     //-------------------------set parameters---------------------------
-              
+    std::ofstream outFile;
+    std::ifstream srcFile;
+
     while(ros::ok()) 
     {
         //-----------------------------------------ros callback-----------------------------------------------------
         ros::spinOnce();
         cap.read(input);
+        cv::imshow("input", input);
         //-------------------------------------apply undistortion to image------------------------------------------
         initUndistortRectifyMap(K, D, cv::Mat_<double>::eye(3, 3), K.clone(), imageSize, CV_16SC2, map1, map2);
         factorK << camIntrinsics[0], 0, camIntrinsics[2],
                0, camIntrinsics[1], camIntrinsics[3],
                0, 0, 1;
-        cv::remap(input, input, map1, map2, cv::INTER_LINEAR);
+        // cv::remap(input, input, map1, map2, cv::INTER_LINEAR);
         cv::Size s = input.size();
         cv::imshow("undistortion", input);
         //-------------------------------standardization finished, start to set roi---------------------------------
@@ -108,36 +106,23 @@ int main(int argc, char** argv)
             cv::warpPerspective(input, imageROI, perspectiveMatrix, Point(dstWidth,dstHeight));
         }
         //---------------------------------------find red/green laser in image--------------------------------------
-        if(redFlag)
+        if( !trackFlag && !recFlag)
         {
             if(standardizeFlag)
             {
-                if(getRedPoint(imageROI) && pubRedFlag)
+                if(getRedPoint(imageROI))
                 {
+                    pubPoint.data.push_back(redPointTransLocation.x);
+                    pubPoint.data.push_back(redPointTransLocation.y);
                     pointPub.publish(pubPoint);
                 }
             }
             else
             {
-                if(getRedPoint(input) && pubRedFlag)
+                if(getRedPoint(input))
                 {
-                    pointPub.publish(pubPoint);
-                }
-            }   
-        }
-        if(greenFlag)
-        {
-            if(standardizeFlag)
-            {
-                if(getGreenPoint(imageROI) && pubGreenFlag)
-                {
-                    pointPub.publish(pubPoint);
-                }
-            }
-            else
-            {
-                if(getGreenPoint(input) && pubGreenFlag)
-                {
+                    pubPoint.data.push_back(redPointTransLocation.x);
+                    pubPoint.data.push_back(redPointTransLocation.y);
                     pointPub.publish(pubPoint);
                 }
             }   
@@ -147,44 +132,88 @@ int main(int argc, char** argv)
         {
             if(standardizeFlag)
             {
-                if(getRec(imageROI) && pubRecFlag)
+                if(getRec(imageROI))
                 {
-                    pointPub.publish(pubPoint);
+                    recCount++;
+                    if(recCount > 10)
+                    {
+                        recCount = 0;
+                        pointPub.publish(pubPoint);
+                        recFlag = false;
+                    }
+                    
+                    std::cout << "already pub rectangular data" << std::endl;
+                    
                 }
             }
             else
             {
-                if(getRec(input) && pubRecFlag)
+                if(getRec(input))
                 {
                     pointPub.publish(pubPoint);
+                    recFlag = false;
                 }
             }
         }
         //--------------------------------make green laser track red laser------------------------------------------
         if(trackFlag)
         {
-            if(standardizeFlag)
+            if(getRedPoint(input) && getGreenPoint(input))
             {
-                if(getRedPoint(imageROI) && getGreenPoint(imageROI)) 
-                {
-                    pointPub.publish(pubPoint);
-                }
-            }
-            else
-            {
-                if(getRedPoint(input) && getGreenPoint(input))
-                {
-                    pointPub.publish(pubPoint);
-                }
+                pubPoint.data.push_back(redPointTransLocation.x - greenPointTransLocation.x);
+                pubPoint.data.push_back(redPointTransLocation.y - greenPointTransLocation.y);
+                pointPub.publish(pubPoint);
             }
         }
-    
+        if(readFile)
+        {
+            srcFile.open("/home/jetson/workspace/trackingsys/src/image_proc/config/standard.txt");
+            std::cout << "open file successfully" << std::endl;
+            float x;
+            int count = 0;
+            cv::Point2f middlePoint;
+            while(srcFile >> x)
+            {
+                if(count == 0)
+                {
+                    count++;
+                    middlePoint.x = x;
+                }
+                else if(count == 1)
+                {
+                    count = 0;
+                    middlePoint.y = x;
+                    srcPoints.push_back(middlePoint);
+                    std::cout << "middlePoint : " << middlePoint << std::endl;
+                }
+            }
+            readFile = false;
+            standardizeFlag = true;
+            srcFile.close();
+        }
+        
+        if(writeFile)
+        {
+            
+            if(flag == 1)
+            {
+                outFile.open("/home/jetson/workspace/trackingsys/src/image_proc/config/standard.txt"); 
+            }
+            outFile << redPointLocation.x << std::endl;
+            outFile << redPointLocation.y << std::endl;
+            writeFile = false;
+            if(flag==4)
+            {
+                outFile.close();
+            }
+        }
         //--------------------------------ros publish topic-------------------------------------------
         
         pubPoint.data.clear();
         
         cv::waitKey(1);
     }
+    
     return 0;
 }
 
@@ -195,25 +224,6 @@ int main(int argc, char** argv)
 bool compareContourAreas(const std::vector<cv::Point>& contour1, const std::vector<cv::Point>& contour2) 
 {
     return cv::contourArea(contour1, false) < cv::contourArea(contour2, false);
-}
-
-/* 
- * image process function
- * get real Point's location
-*/
-Eigen::Vector3d getRealLocation(cv::Point2f targetPoint)
-{
-    Eigen::Vector2d srcPoint, originSrc;
-    Eigen::Vector3d dstPoint, originDst;
-    srcPoint << targetPoint.x, targetPoint.y;
-    originSrc << static_cast<double>((srcPoints[0].x+srcPoints[2].x)/2), static_cast<double>((srcPoints[0].y+srcPoints[2].y)/2);
-    std::cout << "originSrc : " << originSrc[0] << " , " << originSrc[1] << std::endl;
-    cam.liftProjective(srcPoint, dstPoint);
-    cam.liftProjective(originSrc, originDst);
-    std::cout << "originDst : " << originDst[0] << " , " << originDst[1] << std::endl;
-    dstPoint[0] = 1.1 * (dstPoint[0] - originDst[0]);
-    dstPoint[1] = 1.1 * (dstPoint[1] - originDst[1]);
-    return dstPoint;
 }
 
 /* 
@@ -232,7 +242,7 @@ bool getRedPoint(cv::Mat input)
     cv::Mat bgr[3];
     cv::split(input, bgr);
 
-    cv::Mat redMask = (bgr[2] - bgr[1]) > 50;  // B - G
+    cv::Mat redMask = (bgr[2] - bgr[1]) > 80;  // B - G
     cv::imshow("redMask", redMask);
 
     std::vector<std::vector<cv::Point>> redContours;
@@ -250,15 +260,10 @@ bool getRedPoint(cv::Mat input)
         redPointLocation.x = redM.m10 / redM.m00;
         redPointLocation.y = redM.m01 / redM.m00;
 
-        if(pubRedFlag)
-        {
-            // Eigen::Vector3d redTargetPoint = getRealLocation(redPointLocation);
-            redPointLocation.x = (redPointLocation.x - dstWidth/2) / 10;
-            redPointLocation.y = (redPointLocation.y - dstHeight/2) / 10;
-            pubPoint.data.push_back(redPointLocation.x);
-            pubPoint.data.push_back(redPointLocation.y);
-            // std::cout << "redRealPoint : " << redTargetPoint[0] << " , " << redTargetPoint[1] << std::endl;
-        }
+        // Eigen::Vector3d redTargetPoint = getRealLocation(redPointLocation);
+        redPointTransLocation.x = (redPointLocation.x - dstWidth/2) / 10;
+        redPointTransLocation.y = (redPointLocation.y - dstHeight/2) / 10;
+        // std::cout << "redRealPoint : " << redTargetPoint[0] << " , " << redTargetPoint[1] << std::endl;
 
         std::cout << "redPoint : " << redPointLocation.x << " , " << redPointLocation.y << std::endl;
         return true;
@@ -293,16 +298,11 @@ bool getGreenPoint(cv::Mat input)
         greenPointLocation.x = greenM.m10 / greenM.m00;
         greenPointLocation.y = greenM.m01 / greenM.m00;
 
-        if(pubGreenFlag)
-        {
-            // Eigen::Vector3d greenTargetPoint = getRealLocation(greenPointLocation);
-            std::cout << "starting pub greenPoint" << std::endl;
-            greenPointLocation.x = (greenPointLocation.x - dstWidth/2) / 10;
-            greenPointLocation.y = (greenPointLocation.y - dstHeight/2) / 10;
-            pubPoint.data.push_back(greenPointLocation.x);
-            pubPoint.data.push_back(greenPointLocation.y);
-            // std::cout << "greenRealPoint : " << greenTargetPoint[0] << " , " << greenTargetPoint[1] << std::endl;
-        }
+        // Eigen::Vector3d greenTargetPoint = getRealLocation(greenPointLocation);
+        std::cout << "starting pub greenPoint" << std::endl;
+        greenPointTransLocation.x = (greenPointLocation.x - dstWidth/2) / 10;
+        greenPointTransLocation.y = (greenPointLocation.y - dstHeight/2) / 10;
+        // std::cout << "greenRealPoint : " << greenTargetPoint[0] << " , " << greenTargetPoint[1] << std::endl;
 
         std::cout << "greenPoint : " << greenPointLocation.x << " , " << greenPointLocation.y << std::endl;
         return true;
@@ -351,6 +351,7 @@ bool getRec(cv::Mat input)
         {
             cv::drawContours(input, std::vector<std::vector<cv::Point>>(1, approx), -1, cv::Scalar(0, 255, 0), 2);
             cv::imshow("rectangular", input);
+            std::cout << "get rectangular" << std::endl;
         }   
     }
     cv::RotatedRect rect1 = cv::minAreaRect(maxRecContours[0]);
@@ -365,13 +366,10 @@ bool getRec(cv::Mat input)
     {
         center_points[i] = (box1[i] + 3*box2[i]) / 4;
         // std::cout << "rectangular" << i << " : " << center_points[i] << std::endl;
-        if(pubRecFlag)
-        {
-            center_points[i].x = (center_points[i].x - dstWidth/2) / 10;
-            center_points[i].y = (center_points[i].y - dstHeight/2) / 10;
-            pubPoint.data.push_back(center_points[i].x);
-            pubPoint.data.push_back(center_points[i].y);
-        }
+        center_points[i].x = (center_points[i].x - dstWidth/2) / 10;
+        center_points[i].y = (center_points[i].y - dstHeight/2) / 10;
+        pubPoint.data.push_back(center_points[i].x);
+        pubPoint.data.push_back(center_points[i].y);
         if(i==3)
         {
             return true;
@@ -387,102 +385,37 @@ bool getRec(cv::Mat input)
 */
 void getState(const std_msgs::Int8 stateFlag)
 {
-    int8_t flag = stateFlag.data;
+    flag = stateFlag.data;
     ROS_INFO("flag is %d", flag);
     //---------------- start standarlization and standardizing--------------------
-    if(flag==1 || flag==2 || flag==3)
+    if(flag==1 || flag==2 || flag==3 || flag==4)
     {
         recFlag = false;
         standardizeFlag = false;
         trackFlag = false;
-        pubRedFlag = false;
-        pubRecFlag = false;
-        pubGreenFlag = false;
-        if(redFlag)
-        {
-            srcPoints.push_back(redPointLocation);
-            std::cout <<  redPointLocation << std::endl;
-        }
-        if(greenFlag)
-        {
-            srcPoints.push_back(greenPointLocation);
-            std::cout <<  greenPointLocation << std::endl;
-        }  
+        writeFile = true;
+        std::cout <<  redPointLocation << std::endl;
+
     }
-    //-------------------- finish standarlization--------------------------------
-    if(flag == 4)
-    {
-        recFlag = false;
-        trackFlag = false;
-        pubRedFlag = false;
-        pubRecFlag = false;
-        pubGreenFlag = false;
-        if(redFlag)
-        {
-            srcPoints.push_back(redPointLocation);
-            standardizeFlag = true;
-            std::cout <<  redPointLocation << std::endl;
-        }
-        if(greenFlag)
-        {
-            srcPoints.push_back(greenPointLocation);
-            standardizeFlag = true;
-            std::cout <<  greenPointLocation << std::endl;
-        }  
-    }
-    //----------------------basic requirement(1)--------------------------------
+    //---------------------basic requirement(3)(4)------------------------------
+    //------------------extend requirement(1) for red laser system--------------
     //---------------------get and pub red laser point--------------------------
     if(flag == 5)
     {
-        if(redFlag)
-        {
-            recFlag = false;
-            pubRedFlag = true;
-            pubRecFlag = false;
-            pubGreenFlag = false;
-            trackFlag = false;
-        }
-    }
-    //----------------------basic requirement(2)--------------------------------
-    //---------------------get and pub red laser point--------------------------
-    //------------------extend requirement(1) for red laser system--------------
-    if(flag == 6)
-    {
-        if(redFlag)
-        {
-            recFlag = false;
-            pubRedFlag = true;
-            pubRecFlag = false;
-            pubGreenFlag = false;
-            trackFlag = false;
-        }
-    }
-    //----------------------basic requirement(3)(4)-----------------------------
-    //---------------------get and pub rectangular point------------------------
-    //---------------------get and pub red laser point--------------------------
-    //------------------extend requirement(2) for red laser system--------------
-    if(flag == 7)
-    {
-        if(redFlag)
-        {
-            recFlag = true;
-            pubRedFlag = false;
-            pubRecFlag = true;
-            pubGreenFlag = false;
-            trackFlag = false;
-        }
+        if(!standardizeFlag)
+            readFile = true;
+        recFlag = true;
+        trackFlag = false;
     }
     //-------------extend requirement(1)(2) for green laser system--------------
     //-------------------get and pub red+green laser point----------------------
-    if(flag == 8)
+    if(flag == 6)
     {
-        if(greenFlag)
-        {
-            recFlag = false;
-            trackFlag = true;
-            pubRecFlag = false;
-            pubGreenFlag = false;
-            pubRedFlag = false;
-        }
+        if(!standardizeFlag)
+            readFile = true;
+        recFlag = false;
+        trackFlag = true;
     }
 }
+
+
