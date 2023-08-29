@@ -31,47 +31,49 @@
 #define KEY_Pause 16
 #define KEY_RESET 8
 
-typedef struct 
-{
-    float A;
-    float B;
-    float C;
-    float D;
-    float E;
-    float F;
-    float G;
-    float H;
-    float I;
-} _parameters;
+// typedef struct 
+// {
+//     float A;
+//     float B;
+//     float C;
+//     float D;
+//     float E;
+//     float F;
+//     float G;
+//     float H;
+//     float I;
+// } _parameters;
+// _parameters M;
+// void Calibration(float x[3],float y[3],float x_[3],float y_[3]){
+//     M.A=((x_[0]-x_[1])/(y[0]-y[1]) - (x_[0]-x_[2])/(y[0]-y[2]))
+//         /((x[0]-x[1])/(y[0]-y[1]) - (x[0]-x[2])/(y[0]-y[2]));
+//     M.B=((x_[0]-x_[2])/(y[0]-y[2])) - M.A*((x[0]-x[2])/(y[0]-y[2]));
+//     M.C=x_[0]-M.A*x[0]-M.B*y[0];
+//     M.E=((y_[2]-y_[0])/(x[2]-x[0]) - (y_[2]-y_[1])/(x[2]-x[1]))
+//         /((y[2]-y[0])/(x[2]-x[0]) - (y[2]-y[1])/(x[2]-x[1]));
+//     M.D=((y_[2]-y_[0])/(x[2]-x[0])) - M.E*((y[2]-y[0])/(x[2]-x[0]));
+//     M.F=y_[0]-M.D*x[0]-M.E*y[0];
+//     M.G=0;
+//     M.H=0;
+//     M.I=1;
+// }
+//void Transfer(float x_camera,float y_camera, float* x_servo, float* y_servo){
+//    *x_servo=M.A*x_camera+M.B*y_camera+M.C;
+//    *y_servo=M.D*x_camera+M.E*y_camera+M.F;
+//}
 
-_parameters M;
+float offset_x=0;
+float offset_y=0;
+float scale_x=1;
+float scale_y=1;
+float static_x=0;
+float static_y=0;
 
-void Calibration(float x[3],float y[3],float x_[3],float y_[3]){
-    M.A=((x_[0]-x_[1])/(y[0]-y[1]) - (x_[0]-x_[2])/(y[0]-y[2]))
-        /((x[0]-x[1])/(y[0]-y[1]) - (x[0]-x[2])/(y[0]-y[2]));
-
-    M.B=((x_[0]-x_[2])/(y[0]-y[2])) - M.A*((x[0]-x[2])/(y[0]-y[2]));
-
-    M.C=x_[0]-M.A*x[0]-M.B*y[0];
-
-    M.E=((y_[2]-y_[0])/(x[2]-x[0]) - (y_[2]-y_[1])/(x[2]-x[1]))
-        /((y[2]-y[0])/(x[2]-x[0]) - (y[2]-y[1])/(x[2]-x[1]));
-
-    M.D=((y_[2]-y_[0])/(x[2]-x[0])) - M.E*((y[2]-y[0])/(x[2]-x[0]));
-
-    M.F=y_[0]-M.D*x[0]-M.E*y[0];
-
-    M.G=0;
-
-    M.H=0;
-
-    M.I=1;
+void Trans(float camera_pointx,float camera_pointy,float& servo_pointx,float& servo_pointy){
+    servo_pointx=(camera_pointx+offset_x)*scale_x;
+    servo_pointy=(camera_pointy+offset_y)*scale_y;
 }
 
-void Transfer(float x_camera,float y_camera, float* x_servo, float* y_servo){
-    *x_servo=M.A*x_camera+M.B*y_camera+M.C;
-    *y_servo=M.D*x_camera+M.E*y_camera+M.F;
-}
 
 //按键信息 ------------------------------------------------------------------------------------
 int key_index=0;
@@ -97,7 +99,6 @@ void img_callback(const std_msgs::Float32MultiArray::ConstPtr& msg){
         laser_point[1]=msg->data[1];
         ROS_INFO("Get Laser Point %f %f",
         laser_point[0],laser_point[1]);
-        
     }
     if(arrayLength==8){
         rect_flag=1;
@@ -105,14 +106,18 @@ void img_callback(const std_msgs::Float32MultiArray::ConstPtr& msg){
         // Transfer(msg->data[2],msg->data[3],&rectangle_point[2],&rectangle_point[3]);
         // Transfer(msg->data[4],msg->data[5],&rectangle_point[4],&rectangle_point[5]);
         // Transfer(msg->data[6],msg->data[7],&rectangle_point[6],&rectangle_point[7]);
-        rectangle_point[0]=msg->data[0];
-        rectangle_point[1]=msg->data[1];
-        rectangle_point[2]=msg->data[2];
-        rectangle_point[3]=msg->data[3];
-        rectangle_point[4]=msg->data[4];
-        rectangle_point[5]=msg->data[5];
-        rectangle_point[6]=msg->data[6];
-        rectangle_point[7]=msg->data[7];
+        Trans(msg->data[0],msg->data[1],rectangle_point[0],rectangle_point[1]);
+        Trans(msg->data[2],msg->data[3],rectangle_point[2],rectangle_point[3]);
+        Trans(msg->data[4],msg->data[5],rectangle_point[4],rectangle_point[5]);
+        Trans(msg->data[6],msg->data[7],rectangle_point[6],rectangle_point[7]);
+        // rectangle_point[0]=msg->data[0];
+        // rectangle_point[1]=msg->data[1];
+        // rectangle_point[2]=msg->data[2];
+        // rectangle_point[3]=msg->data[3];
+        // rectangle_point[4]=msg->data[4];
+        // rectangle_point[5]=msg->data[5];
+        // rectangle_point[6]=msg->data[6];
+        // rectangle_point[7]=msg->data[7];
         ROS_INFO("Get Rectangle Point %f %f %f %f %f %f %f %f",
         rectangle_point[0],rectangle_point[1],rectangle_point[2],rectangle_point[3],
         rectangle_point[4],rectangle_point[5],rectangle_point[6],rectangle_point[7]);
@@ -127,12 +132,10 @@ void tf_callback(const std_msgs::Float32MultiArray::ConstPtr& msg){
 }
 
 //舵机控制 ------------------------------------------------------------------------------------
-float servo_rawtarget[2]={1024,1024};
 float servo_raw[2]={1024,1024};
 
-float servo_angletarget[2]={0,0};
 float servo_angle[2]={0,0};
-float servo_XYtarget[2]={0,0};
+float servo_XYtarget[2]={-25,0};
 float servo_XY[2]={0,0};
 
 float error[2]={0,0};
@@ -157,19 +160,24 @@ void SaveCenter(int x,int y){
 }
 
 //建模XY与PitchRoll的关系
-const float L=100;
-const float l=4;
+float L=100;
+float l=4;
 float servo_to_camera[]={0,-24,1.24,-1};//offset scale servo 1~camera 2;then 2 
 void AngleToXY(float pitch,float roll,float& x,float& y){
-    y=tanf(pitch)*(L)+l*cosf(pitch)+l/cosf(pitch);
-    x=tanf(roll)*(sqrtf(y*y+L*L));
+     y=tanf(pitch)*(L)+l*cosf(pitch)+l/cosf(pitch);
+     x=tanf(roll)*(sqrtf(y*y+L*L));
+    //x=tanf(roll)*L;
+    //y=tanf(pitch)*sqrtf(L*L+x*x)+l/cosf(pitch);
 }
 void XYToAngle(float x,float y,float& pitch,float& roll){
-    pitch=atan((y-(l*cosf(pitch)+l/cosf(pitch)))/L);
-    roll=atan((x)/sqrtf(y*y+L*L));
+     pitch=atan((y-(l*cosf(pitch)+l/cosf(pitch)))/L);
+     roll=atan((x)/sqrtf(y*y+L*L));
+    //roll=atan(x/L);
+    //pitch=atan((y-l/cosf(pitch))/sqrtf(x*x+L*L));
 }
 
 std::string filename="/home/jetson/workspace/trackingsys/src/control_pkg/data.txt";
+std::string sfilename="/home/jetson/workspace/trackingsys/src/control_pkg/sdata.txt";
 // A function that reads data from a file and stores them in an array
 void read_data(const std::string& filename, float data[8]) {
     std::ifstream input(filename);
@@ -193,6 +201,27 @@ void write_data(const std::string& filename, const float data[8]) {
             output << data[i] << "\n";
         }
         output << center_point[0] << "\n" << center_point[1];
+        output.close();
+    }
+    else {
+        std::cerr << "Error: Unable to open file " << filename << "\n";
+    }
+}
+void read_static_data(const std::string& filename) {
+    std::ifstream input(filename);
+    if (input.is_open()) {
+        input >> static_x >> static_y;
+        input.close();
+    } 
+    else {
+        std::cerr << "Error: Unable to open file " << filename << "\n";
+    }
+}
+
+void write_static_data(const std::string& filename) {
+    std::ofstream output(filename);
+    if(output.is_open()) {
+        output << static_x <<'\n'<< static_y;
         output.close();
     }
     else {
@@ -241,7 +270,7 @@ int main(int argc, char **argv){
     ros::init(argc, argv, "control_node");
     ros::NodeHandle nh;
     ROS_INFO("Intializing Control...");
-    std::string offsetxStr, offsetyStr, scalexStr, scaleyStr;
+    std::string offsetxStr, offsetyStr, scalexStr, scaleyStr,Lstr,lstr;
     if (nh.getParam("control_node_/offsetx", offsetxStr) &&
       nh.getParam("control_node_/offsety", offsetyStr) &&
       nh.getParam("control_node_/scalex", scalexStr) &&
@@ -251,19 +280,32 @@ int main(int argc, char **argv){
         servo_to_camera[0] = std::stof(offsetxStr);
         servo_to_camera[1] = std::stof(offsetyStr);
         servo_to_camera[2] = std::stof(scalexStr);
-       
         servo_to_camera[3] = std::stof(scaleyStr);
     }
+    nh.getParam("control_node_/L", Lstr);
+    nh.getParam("control_node_/l", lstr);
+    L=std::stof(Lstr);
+    l=std::stof(lstr);
+
     read_data(filename,edge_point);
-    float c_pointx[]={-25,-25,25};
-    float c_pointy[]={25,-25,-25};
-    float s_pointx[]={edge_point[6],edge_point[0],edge_point[2]};
-    float s_pointy[]={edge_point[7],edge_point[1],edge_point[3]};
+    read_static_data(sfilename);
+    scale_x=(edge_point[2]-edge_point[0]+edge_point[4]-edge_point[6])/100;
+    scale_y=-(edge_point[1]-edge_point[7]+edge_point[3]-edge_point[5])/100;
+    offset_x=(edge_point[2]+edge_point[0]+edge_point[4]+edge_point[6])/4;
+    offset_y=-(edge_point[1]+edge_point[7]+edge_point[3]+edge_point[5])/4;
+    ROS_INFO("%.2f %.2f %.2f %.2f",offset_x,offset_y,scale_x,scale_y);
+    ROS_INFO("%.2f %.2f",static_x,static_y);
+    //float c_pointx[]={-25,-25,25};
+    //float c_pointy[]={25,-25,-25};
+    //float s_pointx[]={edge_point[6],edge_point[0],edge_point[2]};
+    //float s_pointy[]={edge_point[7],edge_point[1],edge_point[3]};
     //-25,25  -25,-25  25,-25 
-    Calibration(c_pointx,c_pointy,s_pointx,s_pointy);
+    //Calibration(c_pointx,c_pointy,s_pointx,s_pointy);
+    //ROS_INFO("Control_node:offsetx:%f offsety:%f scalex:%f scaley:%f",)
+    //ROS_INFO("%f %f %f %f %f %f %f %f %f",M.A,M.B,M.C,M.D,M.E,M.F,M.G,M.H,M.I);
 
     //ROS_INFO("%f %f %f %f %f %f %f %f %f",M.A,M.B,M.C,M.D,M.E,M.F,M.G,M.H,M.I);
-    ROS_INFO("read: %f %f %f %f %f %f %f %f",edge_point[0], edge_point[1], edge_point[2], edge_point[3], edge_point[4], edge_point[5], edge_point[6], edge_point[7]);
+    //ROS_INFO("read: %f %f %f %f %f %f %f %f",edge_point[0], edge_point[1], edge_point[2], edge_point[3], edge_point[4], edge_point[5], edge_point[6], edge_point[7]);
     //订阅话题读取键盘按键，点坐标（分别是点和矩形四点），舵机角度反馈
     ros::Subscriber key_sub = nh.subscribe("key/read", 10, key_callback);
     ros::Subscriber img_sub = nh.subscribe("img/read", 10, img_callback);
@@ -299,7 +341,8 @@ int main(int argc, char **argv){
             ROS_INFO("key_index:%d",key_index);
             //key_msg.data=key_index;
         }
-
+        key_msg.data=global_state+'0';
+        key_pub.publish(key_msg);
         servo_angle[0]=(servo_raw[0]-1024)/2048.0*3.1415926;
         servo_angle[1]=(servo_raw[1]-1024)/2048.0*3.1415926;
 
@@ -317,6 +360,7 @@ int main(int argc, char **argv){
             //case 2 红色激光回到中心
             //case 3 巡屏幕边线
             //case 4 寻A4标靶边线
+            //case 5 指定点标定
             switch (global_state){
             case 0:{
                 if(key_index!=0&&key_index!=KEY_CONFIRM){
@@ -328,8 +372,11 @@ int main(int argc, char **argv){
                     {
                     case 1:{
                         count=1;
+                        break;
                     }
                     case 4:{
+                        servo_XYtarget[0]=center_point[0]-50;
+                        servo_XYtarget[1]=center_point[1]-50;
                         rect_flag=0;
                         img_msg.data=5;
                         img_pub.publish(img_msg);
@@ -347,7 +394,7 @@ int main(int argc, char **argv){
             case 1:{
                 key_move_laser(key_index);
                 if(key_index==KEY_CONFIRM){
-                    if(count<5){
+                    if(count<5){//1 2 3 4
                         img_msg.data=count;
                         img_pub.publish(img_msg);
                         SaveRectangle(count-1,servo_XY[0],servo_XY[1]);
@@ -364,7 +411,7 @@ int main(int argc, char **argv){
                     }
                 }
                 if(key_index==KEY_RESET){
-                    count=0;
+                    count=1;
                     global_state=0;
                 }
                 break;
@@ -380,13 +427,17 @@ int main(int argc, char **argv){
             }
             
             case 3:{
-                const int index0=2*(((int)run_time%4/1));//0~23 /6=0~3  0 2 4 6
+                const int index0=2*(((int)run_time%8/2));//0~23 /6=0~3  0 2 4 6
                 const int index1=index0+1;// 1 3 5 7
+                //float tmp[8];
+                //float camera[8]={-25,-25,25,-25,25,25,-25,25};
+                //Transfer(camera[index0],camera[index1],&tmp[index0],&tmp[index1]);//get xy
+                //ROS_INFO("%f,%f,%f,%f,",)
                 float x_delta=abs(edge_point[index0]-servo_XYtarget[0]);
                 float y_delta=abs(edge_point[index1]-servo_XYtarget[1]);
                 if(sqrtf(x_delta*x_delta+y_delta*y_delta)>10){
-                    x_delta=0.1;
-                    y_delta=0.1;
+                    x_delta=0.06;
+                    y_delta=0.06;
                 }
                 else if(sqrtf(x_delta*x_delta+y_delta*y_delta)>5){
                     x_delta=0.12;
@@ -402,25 +453,46 @@ int main(int argc, char **argv){
             }
             
             case 4:{
-                const int index0=2*(((int)run_time%8/2));//0~23 /6=0~3  0 2 4 6
+                const int index0=2*(((int)run_time%28/7));//0~23 /6=0~3  0 2 4 6
                 const int index1=index0+1;// 1 3 5 7
                 if(rect_flag==1){
-                    float x_delta=abs((rectangle_point[index0]+servo_to_camera[0])*servo_to_camera[2]-servo_XYtarget[0]);
-                    float y_delta=abs((rectangle_point[index1]+servo_to_camera[1])*servo_to_camera[3]-servo_XYtarget[1]);
+                    //float x_delta=abs((rectangle_point[index0]+servo_to_camera[0])*servo_to_camera[2]-servo_XYtarget[0]);
+                    //float y_delta=abs((rectangle_point[index1]+servo_to_camera[1])*servo_to_camera[3]-servo_XYtarget[1]);
+                    float x_delta=abs(rectangle_point[index0]-static_x-servo_XYtarget[0]);
+                    float y_delta=abs(rectangle_point[index1]-static_y-servo_XYtarget[1]);
                     if(sqrtf(x_delta*x_delta+y_delta*y_delta)>10){
+                        x_delta=0.008;
+                        y_delta=0.008;
+                    }
+                    else if(sqrtf(x_delta*x_delta+y_delta*y_delta)>5){
+                        x_delta=0.016;
+                        y_delta=0.016;
+                    }
+                    else if(sqrtf(x_delta*x_delta+y_delta*y_delta)>0.5){
+                        x_delta=0.05;
+                        y_delta=0.05;
+                    }
+                    else if(sqrtf(x_delta*x_delta+y_delta*y_delta)>0.05){
                         x_delta=0.1;
                         y_delta=0.1;
                     }
-                    else if(sqrtf(x_delta*x_delta+y_delta*y_delta)>5){
-                        x_delta=0.15;
-                        y_delta=0.15;
+                    //servo_XYtarget[0]+=x_delta*((rectangle_point[index0]+servo_to_camera[0])*servo_to_camera[2]-servo_XYtarget[0]);//pos x
+                    //servo_XYtarget[1]+=y_delta*((rectangle_point[index1]+servo_to_camera[1])*servo_to_camera[3]-servo_XYtarget[1]);//pos y
+                    servo_XYtarget[0]+=x_delta*(rectangle_point[index0]-static_x-servo_XYtarget[0]);//pos x
+                    servo_XYtarget[1]+=y_delta*(rectangle_point[index1]-static_y-servo_XYtarget[1]);//pos y
+                    if(key_index==1){
+                        static_x+=0.25;
                     }
-                    else if(sqrtf(x_delta*x_delta+y_delta*y_delta)>3){
-                        x_delta=1;
-                        y_delta=1;
+                    else if(key_index==2){
+                        static_y+=0.25;
                     }
-                    servo_XYtarget[0]+=x_delta*((rectangle_point[index0]+servo_to_camera[0])*servo_to_camera[2]-servo_XYtarget[0]);//pos x
-                    servo_XYtarget[1]+=y_delta*((rectangle_point[index1]+servo_to_camera[1])*servo_to_camera[3]-servo_XYtarget[1]);//pos y
+                    else if(key_index==5){
+                        static_x-=0.25;
+                    }
+                    else if(key_index==6){
+                        static_y-=0.25;
+                    }
+                    write_static_data(sfilename);
                 }
                 break;
             }
@@ -475,8 +547,8 @@ int main(int argc, char **argv){
             servo_msg.data[0]=servo_raw[0];//pos x
             servo_msg.data[2]=servo_raw[1];//pos y
 
-            ROS_INFO("state:%d speed:%d pos:%.3f %.3f target:%.3f %.3f",
-            global_state,speed_flag,servo_XY[0],servo_XY[1],servo_XYtarget[0],servo_XYtarget[1],servo_raw[0],servo_raw[1]);
+            ROS_INFO("state:%d speed:%d count:%d",
+            global_state,speed_flag,count);
 
             
             servo_pub.publish(servo_msg);

@@ -70,7 +70,7 @@ float servo_XY[2]={0,0};
 float error[2]={0,0};
 float error_sum[2]={0,0};
 float error_last[2]={0,0};
-
+float laser_vel[2]={0,0};
 //暂不使用舵机反馈
 // void servo_callback(const std_msgs::Int16MultiArray::ConstPtr& msg){
 //     ROS_INFO("Control_node:recv servo: ",msg->data);
@@ -136,6 +136,9 @@ int main(int argc, char **argv){
     float fix_speed=20;
 
     long counter=0;
+    float Kp=0.1;
+    float Ki=0.0;
+    float Kd=0.0;
 
     ros::Rate loop_rate(10);
     while (ros::ok()) {
@@ -282,35 +285,34 @@ int main(int argc, char **argv){
             break;
         }
         case 3:{
-            const int index0=2*(((int)run_time%4/1));//0~23 /6=0~3  0 2 4 6
-            const int index1=index0+1;// 1 3 5 7
-            float x_delta=abs(edge_point[index0]-servo_XYtarget[0]);
-            float y_delta=abs(edge_point[index1]-servo_XYtarget[1]);
-            if(x_delta>=10){
-                x_delta=0.2;
-            }
-            else if(x_delta<10){
-                x_delta=1;
-            }
-            if(y_delta>=10){
-                y_delta=0.2;
-            }
-            else if(y_delta<10){
-                y_delta=1;
-            }
-            servo_XYtarget[0]+=x_delta*(edge_point[index0]-servo_XYtarget[0]);//pos x
-            servo_XYtarget[1]+=y_delta*(edge_point[index1]-servo_XYtarget[1]);//pos y
+            img_flag=1;
+            //img_pub.publish(img);
+            //servo_XYtarget[0]+=x_delta*(edge_point[index0]-servo_XYtarget[0]);//pos x
+            //servo_XYtarget[1]+=y_delta*(edge_point[index1]-servo_XYtarget[1]);//pos y
+            laser_point[0];
+            laser_point[1];
 
-
-            //servo_XYtarget[0]=edge_point[index0]+counter%20/20.0*(edge_point[index0+2>7?0:index0+2]-edge_point[index0]);
-            //servo_XYtarget[1]=edge_point[index1]+counter%20/20.0*(edge_point[index1+2>7?0:index1+2]-edge_point[index1]);
             if(key_index==KEY_CONFIRM){
                 global_state=0;
             }
             break;
         }
         case 4:{
-            ROS_INFO("red point:%f %f",rectangle_point[0],rectangle_point[1]);
+            if(error_sum[0]>1000){
+                error_sum[0]=1000;
+            }
+            else if(error_sum[1]<-1000){
+                error_sum[1]=-1000;
+            }
+            if(error_sum[0]>1000){
+                error_sum[0]=1000;
+            }
+            else if(error_sum[1]<-1000){
+                error_sum[1]=-1000;
+            }
+            
+            float target[2]={laser_point[0],laser_point[1]};
+            laser_vel[0]=Kp*error[0]+Ki*error_sum[0]+Kd*(error[0]-error_last[0]);
 
             break;
         }

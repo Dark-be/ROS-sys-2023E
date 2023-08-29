@@ -5,10 +5,17 @@
     <node pkg="servo_pkg" type="servo_node" name="servo_node_"  />
 
     <node pkg="control_pkg" type="control_node" name="control_node_" output="screen">
-        <param name="offsetx" type="string" value="-2.5" />
-        <param name="offsety" type="string" value="-20.5" />
-        <param name="scalex" type="string" value="1.13" />
-        <param name="scaley" type="string" value="-1.097" />
+        <param name="offsetx" type="string" value="-2.83" />
+        <param name="offsety" type="string" value="-19" />
+        <param name="scalex" type="string" value="1.1" />
+        <param name="scaley" type="string" value="-1.15" />
+        <!-- <param name="offsetx" type="string" value="-6.83" />
+        <param name="offsety" type="string" value="-70.5" />
+        <param name="scalex" type="string" value="1.0" />
+        <param name="scaley" type="string" value="-1.0" /> -->
+        <param name="L" type="string" value="100" />
+        <param name="l" type="string" value="4" />
+
     </node>
 
     <node pkg="image_proc" type="image_proc" name="image_node_" output="screen"/> 
